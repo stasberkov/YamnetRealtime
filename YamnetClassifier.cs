@@ -15,7 +15,7 @@ public record ClassificationResult(string ClassName, float Score, int ClassIndex
 public class YamnetInput {
     [VectorType(15600)]
     [ColumnName("waveform")]
-    public float[] Waveform { get; set; } = Array.Empty<float>();
+    public float[] Waveform { get; set; } = [];
 }
 
 /// <summary>
@@ -24,7 +24,7 @@ public class YamnetInput {
 public class YamnetOutput {
     [VectorType(521)]
     [ColumnName("scores")]
-    public float[] Scores { get; set; } = Array.Empty<float>();
+    public float[] Scores { get; set; } = [];
 }
 
 /// <summary>
@@ -34,7 +34,7 @@ public class YamnetClassifier : IDisposable {
     private readonly MLContext _mlContext;
     private ITransformer? _model;
     private PredictionEngine<YamnetInput, YamnetOutput>? _predictionEngine;
-    private Dictionary<int, string> _classMap = new();
+    private Dictionary<int, string> _classMap = [];
 
     public YamnetClassifier() {
         _mlContext = new MLContext(seed: 0);
@@ -121,8 +121,8 @@ public class YamnetClassifier : IDisposable {
                 outputColumnName: inputTensorName,
                 inputColumnName: "waveform")
             .Append(tensorFlowModel.ScoreTensorFlowModel(
-                outputColumnNames: new[] { outputTensorName },
-                inputColumnNames: new[] { inputTensorName },
+                outputColumnNames: [outputTensorName],
+                inputColumnNames: [inputTensorName],
                 addBatchDimensionInput: false))
             .Append(_mlContext.Transforms.CopyColumns(
                 outputColumnName: "scores",

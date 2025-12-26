@@ -112,9 +112,9 @@ void DisplayResults(List<ClassificationResult> results) {
     // Move to display area
     Console.SetCursorPosition(0, Console.CursorTop);
 
-    Console.WriteLine("┌─────────────────────────────────────────────────────────┐");
-    Console.WriteLine("│  Current Classifications                                │");
-    Console.WriteLine("├─────────────────────────────────────────────────────────┤");
+    Console.WriteLine("┌─────────────────────────────────────────────────────────────┐");
+    Console.WriteLine("│  Current Classifications                                    │");
+    Console.WriteLine("├─────────────────────────────────────────────────────────────┤");
 
     foreach (var (result, index) in results.Select((r, i) => (r, i))) {
         var rank = (index + 1).ToString();
@@ -126,9 +126,9 @@ void DisplayResults(List<ClassificationResult> results) {
         Console.WriteLine($"│  {rank}. {name.PadRight(22)} {percentage}% {bar} │");
     }
 
-    Console.WriteLine("├─────────────────────────────────────────────────────────┤");
-    Console.WriteLine($"│  {DateTime.Now:HH:mm:ss} | Press Enter to stop                        │");
-    Console.WriteLine("└─────────────────────────────────────────────────────────┘");
+    Console.WriteLine("├─────────────────────────────────────────────────────────────┤");
+    Console.WriteLine($"│  {DateTime.Now:HH:mm:ss} | Press Enter to stop                             │");
+    Console.WriteLine("└─────────────────────────────────────────────────────────────┘");
 }
 
 void SaveResults(List<ClassificationResult> results) {
