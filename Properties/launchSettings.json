@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "YamnetRealtime": {
+      "commandName": "Project",
+      "workingDirectory": "E:\\yamnet-realtime"
+    }
+  }
+}

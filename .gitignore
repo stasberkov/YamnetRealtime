@@ -1,0 +1,22 @@
+# Build outputs
+bin/
+obj/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Model files (download separately)
+yamnet_model/
+yamnet.tar.gz
+
+# Runtime files
+yamnet_class_map.csv
+detection_*.txt
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
