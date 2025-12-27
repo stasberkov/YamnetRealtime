@@ -48,7 +48,7 @@ audioCapture.OnAudioReady += waveform => {
     isProcessing = true;
 
     try {
-        var results = classifier.Classify(waveform, topK: 5);
+        var results = classifier.Classify(waveform, topK: 9);
         lastResults = results;
         DisplayResults(results);
     }
