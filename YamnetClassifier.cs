@@ -1,5 +1,5 @@
-using Microsoft.ML;
-using Microsoft.ML.Data;
+using Microsoft.ML.OnnxRuntime;
+using Microsoft.ML.OnnxRuntime.Tensors;
 using System.Text.RegularExpressions;
 
 namespace YamnetRealtime;
@@ -10,135 +10,47 @@ namespace YamnetRealtime;
 public record ClassificationResult(string ClassName, float Score, int ClassIndex);
 
 /// <summary>
-/// Input schema for YAMNet model
-/// </summary>
-public class YamnetInput {
-    [VectorType(15600)]
-    [ColumnName("waveform")]
-    public float[] Waveform { get; set; } = [];
-}
-
-/// <summary>
-/// Output schema for YAMNet model (521 AudioSet classes)
-/// </summary>
-public class YamnetOutput {
-    [VectorType(521)]
-    [ColumnName("scores")]
-    public float[] Scores { get; set; } = [];
-}
-
-/// <summary>
-/// YAMNet audio classifier using ML.NET with TensorFlow backend
+/// YAMNet audio classifier using ONNX Runtime
 /// </summary>
 public class YamnetClassifier : IDisposable {
-    private readonly MLContext _mlContext;
-    private ITransformer? _model;
-    private PredictionEngine<YamnetInput, YamnetOutput>? _predictionEngine;
-    private Dictionary<int, string> _classMap = [];
-
-    public YamnetClassifier() {
-        _mlContext = new MLContext(seed: 0);
-    }
+    private InferenceSession? _session;
+    private Dictionary<int, string> _classMap = new();
+    private string? _inputName;
+    private string? _outputName;
 
     /// <summary>
-    /// Initializes the classifier by loading model and class map
+    /// Initializes the classifier by loading ONNX model and class map
     /// </summary>
-    public async Task InitializeAsync(string modelPath = "yamnet_model") {
-        Console.WriteLine("Loading YAMNet model...");
+    public async Task InitializeAsync(string modelPath = "yamnet.onnx") {
+        Console.WriteLine("Loading YAMNet ONNX model...");
 
-        if (!Directory.Exists(modelPath)) {
-            throw new DirectoryNotFoundException(
-                $"Model directory not found: {modelPath}\n" +
-                "Please download the YAMNet SavedModel first. See README.md for instructions.");
+        if (!File.Exists(modelPath)) {
+            throw new FileNotFoundException(
+                $"ONNX model not found: {modelPath}\n" +
+                "Please run 'node setup.mjs' to download the model, or download manually.\n" +
+                "See README.md for instructions.");
         }
 
-        // Load TensorFlow SavedModel
-        var tensorFlowModel = _mlContext.Model.LoadTensorFlowModel(modelPath);
+        // Create ONNX Runtime session with optimizations
+        var options = new SessionOptions();
+        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
 
-        // Inspect and display model schema
-        var schema = tensorFlowModel.GetModelSchema();
-        Console.WriteLine("\n   Model tensors found:");
+        _session = new InferenceSession(modelPath, options);
 
-        string? inputTensorName = null;
-        string? outputTensorName = null;
+        // Get input/output names from model
+        _inputName = _session.InputMetadata.Keys.First();
+        _outputName = _session.OutputMetadata.Keys.First();
 
-        foreach (var col in schema) {
-            var typeName = col.Type.ToString();
-            Console.WriteLine($"   - {col.Name}: {typeName}");
-
-            // Find input tensor (contains "waveform" in name)
-            if (col.Name.Contains("waveform", StringComparison.OrdinalIgnoreCase)) {
-                inputTensorName = col.Name;
-            }
-
-            // Find output tensor (contains "scores" or is a vector of 521)
-            if (col.Name.Contains("scores", StringComparison.OrdinalIgnoreCase) ||
-                typeName.Contains("521")) {
-                outputTensorName = col.Name;
-            }
-        }
-
-        // Fallback: try common TensorFlow Hub naming patterns
-        if (inputTensorName == null) {
-            var inputCandidates = new[] {
-                "serving_default_waveform",
-                "waveform",
-                "input",
-                "input_1",
-                "args_0"
-            };
-            inputTensorName = inputCandidates.FirstOrDefault(c =>
-                schema.Any(s => s.Name.Equals(c, StringComparison.OrdinalIgnoreCase)));
-        }
-
-        if (outputTensorName == null) {
-            var outputCandidates = new[] {
-                "scores",
-                "output_0",
-                "StatefulPartitionedCall",
-                "Identity",
-                "PartitionedCall"
-            };
-            outputTensorName = outputCandidates.FirstOrDefault(c =>
-                schema.Any(s => s.Name.Equals(c, StringComparison.OrdinalIgnoreCase)));
-        }
-
-        if (inputTensorName == null || outputTensorName == null) {
-            Console.WriteLine("\n⚠️ Could not auto-detect tensor names.");
-            Console.WriteLine("Available tensors:");
-            foreach (var col in schema) {
-                Console.WriteLine($"   {col.Name}");
-            }
-            throw new InvalidOperationException("Could not find input/output tensors. Please update code with correct names.");
-        }
-
-        Console.WriteLine($"\n   Using input tensor:  {inputTensorName}");
-        Console.WriteLine($"   Using output tensor: {outputTensorName}");
-
-        // Build pipeline with correct tensor names
-        // First rename our input column to match TensorFlow's expected name
-        var pipeline = _mlContext.Transforms.CopyColumns(
-                outputColumnName: inputTensorName,
-                inputColumnName: "waveform")
-            .Append(tensorFlowModel.ScoreTensorFlowModel(
-                outputColumnNames: [outputTensorName],
-                inputColumnNames: [inputTensorName],
-                addBatchDimensionInput: false))
-            .Append(_mlContext.Transforms.CopyColumns(
-                outputColumnName: "scores",
-                inputColumnName: outputTensorName));
-
-        // Fit on empty data
-        var emptyData = _mlContext.Data.LoadFromEnumerable(Array.Empty<YamnetInput>());
-        _model = pipeline.Fit(emptyData);
-
-        // Create prediction engine
-        _predictionEngine = _mlContext.Model.CreatePredictionEngine<YamnetInput, YamnetOutput>(_model);
-
-        Console.WriteLine("\n✅ YAMNet model loaded successfully");
+        Console.WriteLine($"   Input:  {_inputName} {FormatShape(_session.InputMetadata[_inputName].Dimensions)}");
+        Console.WriteLine($"   Output: {_outputName} {FormatShape(_session.OutputMetadata[_outputName].Dimensions)}");
+        Console.WriteLine("✅ YAMNet ONNX model loaded");
 
         // Load class labels
         await LoadClassMapAsync();
+    }
+
+    private static string FormatShape(int[] dimensions) {
+        return $"[{string.Join(", ", dimensions)}]";
     }
 
     /// <summary>
@@ -178,22 +90,32 @@ public class YamnetClassifier : IDisposable {
     /// <summary>
     /// Classifies audio waveform and returns top K predictions
     /// </summary>
+    /// <param name="waveform">Audio samples (16kHz, mono, ~0.975s = 15600 samples)</param>
+    /// <param name="topK">Number of top predictions to return</param>
     public List<ClassificationResult> Classify(float[] waveform, int topK = 5) {
-        if (_predictionEngine == null)
+        if (_session == null || _inputName == null || _outputName == null)
             throw new InvalidOperationException("Model not loaded. Call InitializeAsync first.");
 
-        if (waveform.Length != 15600) {
-            Console.WriteLine($"⚠️ Warning: Expected 15600 samples, got {waveform.Length}");
-        }
+        // Create input tensor
+        var inputTensor = new DenseTensor<float>(waveform, new[] { waveform.Length });
 
-        var input = new YamnetInput { Waveform = waveform };
-        var output = _predictionEngine.Predict(input);
+        var inputs = new List<NamedOnnxValue>
+        {
+            NamedOnnxValue.CreateFromTensor(_inputName, inputTensor)
+        };
 
-        if (output.Scores == null || output.Scores.Length == 0) {
-            return new List<ClassificationResult>();
-        }
+        // Run inference
+        using var results = _session.Run(inputs);
 
-        return output.Scores
+        // Get scores output
+        var scoresOutput = results.First(r => r.Name == _outputName);
+        var scoresTensor = scoresOutput.AsTensor<float>();
+
+        // Average scores across frames if multiple frames
+        var avgScores = AverageScores(scoresTensor);
+
+        // Get top K results
+        return avgScores
             .Select((score, index) => new ClassificationResult(
                 _classMap.GetValueOrDefault(index, $"Class {index}"),
                 score,
@@ -204,11 +126,45 @@ public class YamnetClassifier : IDisposable {
     }
 
     /// <summary>
+    /// Averages scores across frames (if model returns multiple frames)
+    /// </summary>
+    private float[] AverageScores(Tensor<float> scores) {
+        var dimensions = scores.Dimensions.ToArray();
+
+        // If 1D tensor, return as-is
+        if (dimensions.Length == 1) {
+            return scores.ToArray();
+        }
+
+        // If 2D tensor [frames, classes], average across frames
+        int numFrames = dimensions[0];
+        int numClasses = dimensions[1];
+        var avg = new float[numClasses];
+
+        for (int frame = 0; frame < numFrames; frame++) {
+            for (int cls = 0; cls < numClasses; cls++) {
+                avg[cls] += scores[frame, cls];
+            }
+        }
+
+        for (int cls = 0; cls < numClasses; cls++) {
+            avg[cls] /= numFrames;
+        }
+
+        return avg;
+    }
+
+    /// <summary>
     /// Gets the class name for a given index
     /// </summary>
     public string GetClassName(int index) => _classMap.GetValueOrDefault(index, $"Unknown ({index})");
 
+    /// <summary>
+    /// Gets all available class names
+    /// </summary>
+    public IReadOnlyDictionary<int, string> GetAllClasses() => _classMap;
+
     public void Dispose() {
-        _predictionEngine?.Dispose();
+        _session?.Dispose();
     }
 }

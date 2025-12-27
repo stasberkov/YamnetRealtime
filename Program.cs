@@ -18,7 +18,7 @@ Console.WriteLine();
 using var classifier = new YamnetClassifier();
 
 try {
-    await classifier.InitializeAsync("yamnet_model");
+    await classifier.InitializeAsync();
 }
 catch (Exception ex) {
     Console.WriteLine($"\n❌ Failed to load model: {ex.Message}");
