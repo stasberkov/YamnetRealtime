@@ -9,3 +9,9 @@ Classifies audio into **521 sound categories** from the [AudioSet](https://resea
 - Environment (Rain, Wind, etc.)
 - And many more...
 
+## Build & publish
+
+Package for pi4
+```
+dotnet publish --runtime linux-arm64 --self-contained -o yamnet YamnetRealtime.csproj
+```
