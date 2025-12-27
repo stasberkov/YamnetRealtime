@@ -196,7 +196,7 @@ public class AudioCapture : IDisposable
         }
         else // Linux
         {
-            return "-t alsa default";
+            return "-t alsa hw:1,0";
         }
     }
 
