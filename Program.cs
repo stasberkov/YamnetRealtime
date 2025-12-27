@@ -41,6 +41,7 @@ using var audioCapture = new AudioCapture(sampleRate: 16000, samplesNeeded: 1560
 // Track processing state to avoid overlapping classifications
 var isProcessing = false;
 var lastResults = new List<ClassificationResult>();
+float[] prevBuffer = [];
 
 // Handle audio chunks
 audioCapture.OnAudioReady += waveform => {
@@ -48,7 +49,13 @@ audioCapture.OnAudioReady += waveform => {
     isProcessing = true;
 
     try {
+        if (prevBuffer.Length > 0) {
+            var shiftedWave = prevBuffer.Skip(prevBuffer.Length / 2).Concat(waveform.Take(waveform.Length / 2)).ToArray();
+            var results2 = classifier.Classify(shiftedWave, topK: 9);
+            DisplayResults(results2);
+        }
         var results = classifier.Classify(waveform, topK: 9);
+        prevBuffer = waveform;
         lastResults = results;
         DisplayResults(results);
     }

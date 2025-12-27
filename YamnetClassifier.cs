@@ -14,7 +14,7 @@ public record ClassificationResult(string ClassName, float Score, int ClassIndex
 /// </summary>
 public class YamnetClassifier : IDisposable {
     private InferenceSession? _session;
-    private Dictionary<int, string> _classMap = new();
+    private Dictionary<int, string> _classMap = [];
     private string? _inputName;
     private string? _outputName;
 
@@ -97,7 +97,7 @@ public class YamnetClassifier : IDisposable {
             throw new InvalidOperationException("Model not loaded. Call InitializeAsync first.");
 
         // Create input tensor
-        var inputTensor = new DenseTensor<float>(waveform, new[] { waveform.Length });
+        var inputTensor = new DenseTensor<float>(waveform, [waveform.Length]);
 
         var inputs = new List<NamedOnnxValue>
         {

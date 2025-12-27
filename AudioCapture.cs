@@ -9,7 +9,7 @@ namespace YamnetRealtime;
 public class AudioCapture : IDisposable {
     private readonly int _sampleRate;
     private readonly int _samplesNeeded;
-    private readonly List<float> _buffer = new();
+    private readonly List<float> _buffer = [];
     private readonly object _lock = new();
 
     private Process? _soxProcess;
