@@ -31,9 +31,9 @@ public class YamnetClassifier : IDisposable {
                 "See README.md for instructions.");
         }
 
-        // Create ONNX Runtime session with optimizations
-        var options = new SessionOptions();
-        options.GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL;
+        var options = new SessionOptions {
+            GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
+        };
 
         _session = new InferenceSession(modelPath, options);
 
@@ -96,7 +96,6 @@ public class YamnetClassifier : IDisposable {
         if (_session == null || _inputName == null || _outputName == null)
             throw new InvalidOperationException("Model not loaded. Call InitializeAsync first.");
 
-        // Create input tensor
         var inputTensor = new DenseTensor<float>(waveform, [waveform.Length]);
 
         var inputs = new List<NamedOnnxValue>
@@ -104,17 +103,13 @@ public class YamnetClassifier : IDisposable {
             NamedOnnxValue.CreateFromTensor(_inputName, inputTensor)
         };
 
-        // Run inference
         using var results = _session.Run(inputs);
 
-        // Get scores output
         var scoresOutput = results.First(r => r.Name == _outputName);
         var scoresTensor = scoresOutput.AsTensor<float>();
 
-        // Average scores across frames if multiple frames
         var avgScores = AverageScores(scoresTensor);
 
-        // Get top K results
         return avgScores
             .Select((score, index) => new ClassificationResult(
                 _classMap.GetValueOrDefault(index, $"Class {index}"),
@@ -133,7 +128,7 @@ public class YamnetClassifier : IDisposable {
 
         // If 1D tensor, return as-is
         if (dimensions.Length == 1) {
-            return scores.ToArray();
+            return [.. scores];
         }
 
         // If 2D tensor [frames, classes], average across frames

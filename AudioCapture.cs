@@ -10,7 +10,7 @@ public class AudioCapture : IDisposable {
     private readonly int _sampleRate;
     private readonly int _samplesNeeded;
     private readonly List<float> _buffer = [];
-    private readonly object _lock = new();
+    private readonly Lock _lock = new();
 
     private Process? _soxProcess;
     private bool _isRunning;
@@ -76,16 +76,11 @@ public class AudioCapture : IDisposable {
     private static void PrintInstallInstructions() {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
             Console.WriteLine("Install SoX on Windows:");
-            Console.WriteLine("  1. Download from: https://sourceforge.net/projects/sox/files/sox/");
-            Console.WriteLine("  2. Run the installer");
-            Console.WriteLine("  3. Add SoX to PATH or install to C:\\Program Files (x86)\\sox-*");
-            Console.WriteLine();
-            Console.WriteLine("Or use Chocolatey:");
-            Console.WriteLine("  choco install sox");
+            Console.WriteLine("  winget install sox");
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) {
             Console.WriteLine("Install SoX on Linux:");
-            Console.WriteLine("  Ubuntu/Debian: sudo apt install sox libsox-fmt-all");
+            Console.WriteLine("  Ubuntu/Debian: sudo apt install sox");
             Console.WriteLine("  Fedora:        sudo dnf install sox");
             Console.WriteLine("  Arch:          sudo pacman -S sox");
         }
@@ -118,7 +113,6 @@ public class AudioCapture : IDisposable {
         //   -b 16 = 16-bit
         //   -e signed-integer = signed integer encoding
         //   -q = quiet mode
-        //   -p = output to pipe (stdout as raw audio)
 
         string inputArgs = GetPlatformInputArgs();
         string arguments = $"{inputArgs} -r {_sampleRate} -c 1 -b 16 -e signed-integer -q -t raw -";
